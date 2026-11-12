@@ -1,0 +1,500 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>LACCO Overlap Explorer</title>
+<meta name="description" content="Interactive explainer for LACCO: Local Accumulation with Computation–Communication Overlap.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔁</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: a single reading column with full-bleed instrument panels; the timeline has its own playhead; Figure 2 runs its own slower clock. */
+:root{
+  --bg:#eef1f5; --surface:#ffffff; --surface2:#f5f7fa; --ink:#121823; --muted:#5a6577; --line:#d5dce6;
+  --main:#2453d4; --look:#d4412f; --net:#7446c9; --pcie:#0b8a80; --stall:#98a3b4;
+  --delayed:#a8730c; --eager:#2b8540; --diloco:#4b5567; --ddp:#8a93a3;
+  --f-display:"Bricolage Grotesque","IBM Plex Sans",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0c1118; --surface:#131a24; --surface2:#18212d; --ink:#e4e9f1; --muted:#8f9bad; --line:#253042;
+  --main:#6e97ff; --look:#ff7563; --net:#a986ff; --pcie:#33c2b5; --stall:#56627a;
+  --delayed:#e2a63b; --eager:#58c26b; --diloco:#a9b4c6; --ddp:#7d889c; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0c1118; --surface:#131a24; --surface2:#18212d; --ink:#e4e9f1; --muted:#8f9bad; --line:#253042;
+  --main:#6e97ff; --look:#ff7563; --net:#a986ff; --pcie:#33c2b5; --stall:#56627a;
+  --delayed:#e2a63b; --eager:#58c26b; --diloco:#a9b4c6; --ddp:#7d889c; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.55;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 64px}
+.wrap{max-width:1120px;margin:0 auto}
+header.wrap{padding-block:40px 8px}
+.eyebrow{font-family:var(--f-mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+h1{font-family:var(--f-display);font-weight:700;font-size:clamp(34px,5.4vw,58px);line-height:1.02;letter-spacing:-.02em;margin:10px 0 14px;text-wrap:balance}
+h1 .t{color:var(--main)} h1 .tt{color:var(--look)}
+h2{font-family:var(--f-display);font-weight:650;font-size:clamp(24px,3vw,32px);line-height:1.1;letter-spacing:-.01em;margin:0 0 8px;text-wrap:balance}
+h3{font-family:var(--f-display);font-weight:600;font-size:18px;margin:0 0 6px}
+p{margin:0 0 12px;max-width:68ch}
+.dek{font-size:17px;color:var(--muted);max-width:70ch}
+.m{color:var(--main);font-weight:600}.l{color:var(--look);font-weight:600}.nt{color:var(--net);font-weight:600}.pc{color:var(--pcie);font-weight:600}
+code,.mono{font-family:var(--f-mono);font-size:.92em}
+section{margin-top:56px;display:flex;flex-direction:column;gap:14px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px}
+.legend{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:13px;color:var(--muted);margin-top:6px}
+.legend span{display:inline-flex;align-items:center;gap:7px}
+.sw{width:14px;height:10px;border-radius:2px;display:inline-block}
+.sw.hatch{background:repeating-linear-gradient(135deg,var(--stall) 0 2px,transparent 2px 5px);border:1px solid var(--stall)}
+.eq{font-family:var(--f-mono);font-size:13.5px;background:var(--surface2);border:1px solid var(--line);border-radius:8px;padding:12px 14px;display:grid;gap:4px;overflow-x:auto}
+.eq b{font-weight:500}
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}
+@media (max-width:760px){.grid2{grid-template-columns:minmax(0,1fr)}}
+/* figure 2, animated */
+.f2 text{font-family:var(--f-mono);font-size:12px;fill:var(--ink)}
+.f2 .lab{font-size:11px;fill:var(--muted);letter-spacing:.04em}
+.f2 .stg-t{font-family:var(--f-body);font-size:12.5px;font-weight:600}
+.f2 .stg-s,.f2 g.stg-s text{font-size:10.5px;fill:var(--muted)}
+.f2 g.grp{transition:opacity .35s}
+.nw{white-space:nowrap}
+.f2 .flow path{stroke-dasharray:6 5;animation:f2flow .55s linear infinite}
+.f2 .flow path.thick{stroke-width:2.2}
+@keyframes f2flow{to{stroke-dashoffset:-11}}
+.svgwrap{overflow-x:auto}
+.svgwrap svg{display:block;min-width:760px;width:100%;height:auto}
+.phasebar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.phasecap{min-height:3.2em;font-size:14.5px}
+button,select{font:inherit;font-size:13px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px 10px;cursor:pointer}
+button:hover{border-color:var(--muted)}
+button.on{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--main);outline-offset:2px}
+/* controls */
+.controls{display:grid;grid-template-columns:repeat(auto-fill,minmax(205px,1fr));gap:12px 18px;align-items:end}
+.ctl{display:flex;flex-direction:column;gap:4px;min-width:0}
+.ctl label{font-size:12px;color:var(--muted);display:flex;justify-content:space-between;gap:8px}
+.ctl output{font-family:var(--f-mono);color:var(--ink);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;accent-color:var(--main)}
+.chk{display:flex;align-items:center;gap:7px;font-size:13px;cursor:pointer}
+.chk input{accent-color:var(--main)}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.toolbar .grow{flex:1 1 160px;min-width:140px}
+.formula{font-family:var(--f-mono);font-size:12.5px;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 18px}
+.formula b{color:var(--ink);font-weight:500}
+canvas{display:block;width:100%;touch-action:none}
+.cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+@media (max-width:900px){.cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:460px){.cards{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:2px;font-variant-numeric:tabular-nums}
+.card .nm{font-family:var(--f-display);font-weight:600;font-size:16px;display:flex;justify-content:space-between;align-items:center;gap:6px}
+.card .big{font-family:var(--f-mono);font-size:22px;line-height:1.2}
+.card .sm{font-size:12.5px;color:var(--muted)}
+.pill{font-family:var(--f-mono);font-size:11px;padding:2px 7px;border-radius:99px;border:1px solid currentColor;white-space:nowrap}
+.pill.ok{color:var(--eager)} .pill.no{color:var(--look)} .pill.na{color:var(--muted)}
+.readout{font-family:var(--f-mono);font-size:12px;color:var(--muted);display:grid;gap:3px;min-height:5.5em}
+.readout b{color:var(--ink);font-weight:500}
+.hint{font-size:12.5px;color:var(--muted)}
+.toyg{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:14px}
+@media (max-width:860px){.toyg{grid-template-columns:minmax(0,1fr)}}
+.narr{font-size:14px;min-height:7.5em}
+.narr .st{font-family:var(--f-mono);font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.chart text{font-family:var(--f-mono);font-size:11px;fill:var(--muted)}
+.chart .ax{stroke:var(--line)} .chart .gl{stroke:var(--line);stroke-dasharray:2 3}
+.chart .ttl{font-family:var(--f-body);font-size:12.5px;fill:var(--ink);font-weight:500}
+.s-diloco{stroke:var(--diloco);fill:var(--diloco)} .s-lacco{stroke:var(--look);fill:var(--look)}
+.s-eager{stroke:var(--eager);fill:var(--eager)} .s-delayed{stroke:var(--delayed);fill:var(--delayed)} .s-ddp{stroke:var(--ddp);fill:var(--ddp)}
+.s-main{stroke:var(--main);fill:var(--main)}
+.chart path.ln{fill:none;stroke-width:2}
+.chart svg{display:block;width:100%;height:auto}
+table{border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums;width:100%}
+th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{font-weight:500;color:var(--muted);font-size:12px}
+td.c,th.c{text-align:center}
+tr.hl td{background:color-mix(in srgb,var(--look) 9%,transparent)}
+.tbl{overflow-x:auto}
+.yes{color:var(--eager)} .noo{color:var(--look)} .q{color:var(--muted)}
+.notes{display:grid;gap:12px;counter-reset:n}
+.note{display:grid;grid-template-columns:28px minmax(0,1fr);gap:4px 10px;padding:12px 14px;background:var(--surface);border:1px solid var(--line);border-radius:8px}
+.note::before{counter-increment:n;content:counter(n);font-family:var(--f-mono);font-size:12px;color:var(--muted);padding-top:2px}
+.note h4{margin:0 0 3px;font-size:14.5px;font-weight:600}
+.note p{margin:0;font-size:14px;color:var(--ink)}
+.note .src{font-size:12px;color:var(--muted);margin-top:4px}
+.tag{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;padding:2px 6px;border-radius:4px;background:var(--surface2);border:1px solid var(--line);color:var(--muted);margin-left:6px;vertical-align:2px}
+footer{margin-top:48px;}
+.tld{position:relative;display:inline-block}.tld::after{content:"\02DC";position:absolute;left:0;right:0;top:.02em;text-align:center;font-size:.9em;line-height:1}
+footer{font-size:12.5px;color:var(--muted)}
+@media (prefers-reduced-motion: reduce){.f2 g.grp{transition:none}.f2 .flow path{animation:none}}
+</style>
+</head>
+<body>
+<header class="wrap">
+  <div class="eyebrow">ICLR 2027 submission 22409 · interactive reading</div>
+  <h1>LACCO, two models on <span class="t">one</span> clock<span class="tt">.</span></h1>
+</header>
+
+<main class="wrap">
+
+<!-- ============ 1. dataflow ============ -->
+<section id="idea">
+  <h2>The Mechanism</h2>
+  <p>Figure 2, run from t = 0 as in Algorithm 1 (θ<sub>0</sub> = θ̃<sub>0</sub>, g̃<sub>0</sub> = 0), with K = 4 replicas.</p>
+  <div class="panel">
+    <div class="svgwrap"><svg class="f2" id="f2" viewBox="0 0 970 318" role="img" aria-label="Figure 2 of the paper, animated from t = 0: four LACCO stages on K = 4 replicas, outer stream above inner stream"></svg></div>
+    <div class="phasebar" style="margin-top:10px">
+      <button id="f2Prev" aria-label="Previous stage">◀</button>
+      <button class="stg" data-s="0">Lookahead 0</button><button class="stg" data-s="1">Main 0</button><button class="stg" data-s="2">Lookahead 1</button><button class="stg" data-s="3">Main 1</button>
+      <button id="f2Next" aria-label="Next stage">▶</button>
+      <button id="f2Play">Pause</button>
+    </div>
+    <div class="readout" id="f2Stat" style="min-height:1.6em;margin-top:10px"></div>
+    
+  </div>
+  </section>
+
+<!-- ============ 2. timeline ============ -->
+<section id="timeline">
+  <h2>Four Schedules, One Clock</h2>
+  <div class="panel" style="display:flex;flex-direction:column;gap:14px">
+    <div class="controls">
+      <div class="ctl"><label for="preset">Scenario</label>
+        <select id="preset">
+          <option value="paper">Paper: H100, 10 GB/s network</option>
+          <option value="wan">Cross-region WAN: 1 GB/s, 40 ms</option>
+          <option value="inet">Internet-grade: 100 MB/s, 80 ms</option>
+          <option value="custom">Custom</option>
+        </select></div>
+      <div class="ctl"><label for="pSel">Model size P</label>
+        <select id="pSel"><option value="134e6">134M (paper)</option><option value="325e6">325M (paper)</option><option value="500e6">500M (paper)</option><option value="1.3e9">1.3B</option><option value="7e9">7B</option><option value="70e9">70B</option></select></div>
+      <div class="ctl"><label for="kSel">Replicas K <span class="hint">global batch fixed</span></label>
+        <select id="kSel"><option>2</option><option selected>4</option><option>8</option><option>16</option></select></div>
+      <div class="ctl"><label for="hR">Inner steps H <output id="hO"></output></label><input type="range" id="hR" min="1" max="100" step="1" value="30"></div>
+      <div class="ctl"><label for="bnR">Network bandwidth <output id="bnO"></output></label><input type="range" id="bnR" min="-1.3" max="2" step="0.001" value="1"></div>
+      <div class="ctl"><label for="latR">All-reduce latency <output id="latO"></output></label><input type="range" id="latR" min="0" max="300" step="1" value="0"></div>
+      <div class="ctl"><label for="mfuR">MFU <output id="mfuO"></output></label><input type="range" id="mfuR" min="0.15" max="0.75" step="0.01" value="0.5"></div>
+      
+      <div class="ctl"><label>Lanes</label>
+        <div style="display:flex;flex-wrap:wrap;gap:4px 12px">
+          <label class="chk"><input type="checkbox" class="laneChk" value="diloco" checked>DiLoCo</label>
+          <label class="chk"><input type="checkbox" class="laneChk" value="eager" checked>Eager</label>
+          <label class="chk"><input type="checkbox" class="laneChk" value="delayed" checked>Delayed</label>
+          <label class="chk"><input type="checkbox" class="laneChk" value="lacco" checked>LACCO</label>
+        </div></div>
+    </div>
+    <div class="formula" id="formula"></div>
+    <div class="toolbar">
+      <button id="tlPlay">Pause</button>
+      <select id="tlSpeed" aria-label="Playback speed"><option value="0.25">0.25×</option><option value="0.5">0.5×</option><option value="1" selected>1× real time</option><option value="2">2×</option><option value="4">4×</option></select>
+      <input class="grow" type="range" id="tlScrub" min="0" max="1000" value="0" aria-label="Scrub playhead">
+      <span class="mono" id="tlTime" style="min-width:7em;text-align:right"></span>
+    </div>
+    <canvas id="tl" aria-label="Timeline of compute, outer step and network activity for each method"></canvas>
+    <div class="readout" id="readout"></div>
+  </div>
+  <div class="cards" id="cards"></div>
+</section>
+
+
+</main>
+
+<script>
+(()=>{
+"use strict";
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const SUBS='₀₁₂₃₄₅₆₇₈₉', sub=n=>String(n).replace(/\d/g,d=>SUBS[d]);
+const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const ease=t=>t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
+
+function tildes(root){if(!root)return;const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);const list=[];while(w.nextNode()){const n=w.currentNode;if(n.nodeValue.indexOf('\u0303')>=0&&!n.parentElement.closest('svg,script,style,title,option,select'))list.push(n);}
+  for(const n of list){const f=document.createDocumentFragment();for(const part of n.nodeValue.split(/(.\u0303)/)){if(part.length===2&&part[1]==='\u0303'){const sp=document.createElement('span');sp.className='tld';sp.textContent=part[0];f.appendChild(sp);}else if(part)f.appendChild(document.createTextNode(part));}n.replaceWith(f);}}
+/* ---------- theme colors ---------- */
+const C={};
+function readColors(){const cs=getComputedStyle(document.documentElement);
+  for(const k of ['bg','surface','surface2','ink','muted','line','main','look','net','pcie','stall','delayed','eager','diloco','ddp']) C[k]=cs.getPropertyValue('--'+k).trim();}
+function rgba(hex,a){hex=hex.replace('#','');if(hex.length===3)hex=hex.split('').map(c=>c+c).join('');
+  const n=parseInt(hex,16);return `rgba(${n>>16&255},${n>>8&255},${n&255},${a})`;}
+function rgb(hex){hex=hex.replace('#','');const n=parseInt(hex,16);return[n>>16&255,n>>8&255,n&255];}
+readColors();
+
+const FM='"IBM Plex Mono", ui-monospace, monospace', FS='"IBM Plex Sans", system-ui, sans-serif', FD='"Bricolage Grotesque", "IBM Plex Sans", sans-serif';
+const METH={diloco:{name:'DiLoCo',col:'diloco'},eager:{name:'Eager DiLoCo',col:'eager'},delayed:{name:'Delayed DiLoCo',col:'delayed'},lacco:{name:'LACCO',col:'look'}};
+const ORDER=['diloco','eager','delayed','lacco'];
+
+function fmtT(s){if(!isFinite(s))return '—';if(s<1)return (s*1000).toFixed(s<0.01?1:0)+' ms';if(s<120)return s.toFixed(2)+' s';if(s<7200)return (s/60).toFixed(1)+' min';if(s<172800)return (s/3600).toFixed(1)+' h';return (s/86400).toFixed(1)+' d';}
+function fmtBW(b){return b>=1e9?(b/1e9).toFixed(b>=1e10?0:2).replace(/\.00$/,'')+' GB/s':(b/1e6).toFixed(0)+' MB/s';}
+function fmtGB(b){return b>=1e9?(b/1e9).toFixed(b>=1e11?0:2)+' GB':(b/1e6).toFixed(0)+' MB';}
+
+/* ---------- settings & timing model (Appendix D) ---------- */
+const S={P:134e6,K:4,H:30,Ntok:131072,Fpeak:1e15,mfu:0.5,bnet:10e9,lat:0};
+const PRESETS={
+  paper:{bnet:10e9,lat:0,mfu:.5},
+  wan:{bnet:1e9,lat:.04,mfu:.5},
+  inet:{bnet:1e8,lat:.08,mfu:.5}};
+function timing(s){
+  const Tstep=6*s.P*s.Ntok/(s.K*s.mfu*s.Fpeak), bytes=4*s.P;
+  const Tcomm=s.lat+2*(s.K-1)/s.K*bytes/s.bnet, Tinner=s.H*Tstep;
+  // all state on the GPU; optimizer kernel time neglected as in Appendix D, so T_outer ~ 0
+  const round={diloco:Tinner+Tcomm,eager:Math.max(Tinner,Tcomm),delayed:Math.max(Tinner,Tcomm),lacco:Math.max(Tinner,Tcomm)};
+  const hc=Math.max(1,Math.ceil(Tcomm/Tstep-1e-9)),hide={delayed:hc,lacco:hc};
+  return {Tstep,Tinner,Tcomm,Odil:0,round,hide,bytes};
+}
+
+/* ---------- event generation ---------- */
+// rows: 0 GPU inner, 1 GPU outer, 2 network
+function outerPath(ev,a,T,seq,label,mom){ev.push({row:1,t0:a,t1:a,kind:'kernel',seq,label,mom});return a;}
+function gen(m,T,W){
+  const ev=[],Sx=T.Tinner,Cm=T.Tcomm,H=S.H;
+  if(m==='diloco'){let t=0,k=0;while(t<W&&k<400){const e=t+Sx;
+    ev.push({row:0,t0:t,t1:e,kind:'compute',seq:'main',label:`θ${sub(k)} · ${H} inner steps`,k});
+    ev.push({row:2,t0:e,t1:e+Cm,kind:'comm',seq:'main',label:`all-reduce g${sub(k)}`});
+    const a=outerPath(ev,e+Cm,T,'main',`θ${sub(k+1)} = Nesterov(θ${sub(k)}, g${sub(k)})`,'mom');
+    ev.push({row:0,t0:e,t1:a,kind:'stall',label:'idle · all-reduce, then outer step'});t=a;k++;}}
+  else if(m==='eager'){let t=0,k=0,prevEnd=0;while(t<W&&k<400){const e=t+Sx;
+    ev.push({row:0,t0:t,t1:e,kind:'compute',seq:'main',label:`θⁱ${sub(k)} · ${H} inner steps`,k});
+    ev.push({row:2,t0:e,t1:e+Cm,kind:'comm',seq:'main',label:`all-reduce g${sub(k)}`});
+    if(k===0)t=e;else{const r=Math.max(e,prevEnd);if(r>e)ev.push({row:0,t0:e,t1:r,kind:'stall',label:`wait for g${sub(k-1)}`});
+      const a=outerPath(ev,r,T,'main',`θⁱ${sub(k+1)} = Nesterov(θⁱ${sub(k)}, mix(gⁱ${sub(k)}, g${sub(k-1)}))`,'mom');
+      ev.push({row:0,t0:r,t1:a,kind:'stall',label:'idle · outer step needs own gⁱ (local sync)'});t=a;}
+    prevEnd=e+Cm;k++;}}
+  else if(m==='lacco'){let t=0,k=0,prevReady=0;
+    while(t<W&&k<400){const it=k>>1,seq=k%2?'look':'main',start=t;
+      const lab=k%2?`Main ${it} · from θ̃${sub(it+1)}`:`Lookahead ${it} · from θ${sub(it)}`;
+      ev.push({row:0,t0:start,t1:start+Sx,kind:'compute',seq,k,h0:0,label:lab});const e=start+Sx;
+      const b=Math.max(e,prevReady);
+      if(b>e+1e-9)ev.push({row:0,t0:e,t1:b,kind:'stall',k,label:'wait · previous outer step'});
+      ev.push({row:2,t0:b,t1:b+Cm,kind:'comm',seq,k,label:k%2?`all-reduce g̃${sub(it+1)}`:`all-reduce g${sub(it)}`});
+      ev.push({row:1,t0:b+Cm,t1:b+Cm,kind:'kernel',seq,k,label:k%2?`θ̃${sub(it+2)} = OuterOpt_L(θ${sub(it+1)}, g̃${sub(it+1)})`:`θ${sub(it+1)} = OuterOpt_M(θ${sub(it)}, ½(g${sub(it)}+g̃${sub(it)}))`});
+      prevReady=b+Cm;t=b;k++;}}
+  else{const L=false,O=T.Odil,ends=[],starts=[];let t=0,k=0;
+    while(t<W&&k<400){starts[k]=t;const e=t+Sx;ends[k]=e;const it=k>>1,seq=L?(k%2?'look':'main'):'main';
+      ev.push({row:0,t0:t,t1:e,kind:'compute',seq,k,label:L?(k%2?`Main ${it} · from θ̃${sub(it+1)}`:`Lookahead ${it} · from θ${sub(it)}`):`θⁱ${sub(k)} · ${H} inner steps`});
+      ev.push({row:2,t0:e,t1:e+Cm,kind:'comm',seq,label:L?(k%2?`all-reduce g̃${sub(it+1)}`:`all-reduce g${sub(it)}`):`all-reduce g${sub(k)}`});
+      let a=outerPath(ev,e+Cm,T,seq,L?(k%2?`θ̃${sub(it+2)} = θ${sub(it+1)} − η·g̃${sub(it+1)}`:`θ${sub(it+1)} = θ${sub(it)} − ½η(g${sub(it)}+g̃${sub(it)})`):`θⁱ${sub(k+2)} = θⁱ${sub(k+1)} − η·g${sub(k)}`,L?(k%2?'momL':'momM'):'mom');
+      const ready=k>=1?ends[k-1]+Cm+O:e,ns=Math.max(e,ready);
+      if(ns>e+1e-9)ev.push({row:0,t0:e,t1:ns,kind:'stall',label:L?`wait · ${(k+1)%2?'θ':'θ̃'} for next stage not ready`:'wait · next start point not ready'});
+      t=ns;k++;}
+    starts[k]=t;
+  }
+  ev.sort((a,b)=>a.t0-b.t0);return ev;
+}
+
+let T=timing(S),EV={},W=10;
+function rebuild(){T=timing(S);
+  const vis=visibleLanes();const rmax=Math.max(...(vis.length?vis:ORDER).map(m=>T.round[m]));
+  W=Math.max(4.6*rmax,1e-3);for(const m of ORDER)EV[m]=gen(m,T,W*1.05);
+  updateFormula();updateCards();fitTL();}
+
+/* ---------- controls ---------- */
+const ui={pSel:$('#pSel'),kSel:$('#kSel'),hR:$('#hR'),bnR:$('#bnR'),latR:$('#latR'),mfuR:$('#mfuR'),preset:$('#preset')};
+function syncUI(){ui.pSel.value=String(S.P===134e6?'134e6':S.P===325e6?'325e6':S.P===500e6?'500e6':S.P===1.3e9?'1.3e9':S.P===7e9?'7e9':'70e9');
+  ui.kSel.value=String(S.K);ui.hR.value=S.H;ui.bnR.value=Math.log10(S.bnet/1e9);ui.latR.value=Math.round(S.lat*1000);
+  ui.mfuR.value=S.mfu;showOut();}
+function showOut(){$('#hO').textContent=S.H;$('#bnO').textContent=fmtBW(S.bnet);$('#latO').textContent=Math.round(S.lat*1000)+' ms';$('#mfuO').textContent=Math.round(S.mfu*100)+'%';}
+function fromUI(custom){S.P=+ui.pSel.value;S.K=+ui.kSel.value;S.H=+ui.hR.value;
+  if(custom){S.bnet=1e9*Math.pow(10,+ui.bnR.value);S.lat=+ui.latR.value/1000;S.mfu=+ui.mfuR.value;}S.Ntok=S.P===500e6?262144:131072;if(custom)ui.preset.value='custom';showOut();rebuild();}
+for(const id of ['hR','bnR','latR','mfuR'])ui[id].addEventListener('input',()=>fromUI(id!=='hR'));
+for(const id of ['pSel','kSel'])ui[id].addEventListener('change',()=>fromUI(false));
+ui.preset.addEventListener('change',()=>{const p=PRESETS[ui.preset.value];if(!p)return;Object.assign(S,p);syncUI();rebuild();});
+$$('.laneChk').forEach(c=>c.addEventListener('change',()=>{rebuild();}));
+function visibleLanes(){return $$('.laneChk').filter(c=>c.checked).map(c=>c.value);}
+
+function updateFormula(){
+  $('#formula').innerHTML=`<span>T<sub>step</sub> = 6·P·N<sub>tok</sub>/(K·MFU·F<sub>peak</sub>) = <b>${fmtT(T.Tstep)}</b></span>
+  <span>T<sub>inner</sub> = H·T<sub>step</sub> = <b>${fmtT(T.Tinner)}</b></span>
+  <span>T<sub>comm</sub> = lat + 2(K−1)/K·4P/b<sub>net</sub> = <b>${fmtT(T.Tcomm)}</b></span>
+  <span>T<sub>outer</sub> ≈ 0 <span style="opacity:.8">(optimizer kernel neglected, Appendix D)</span></span>`;}
+function updateCards(){
+  const steps=20*S.P/S.Ntok,rounds=steps/S.H;
+  $('#cards').innerHTML=ORDER.map(m=>{const r=T.round[m],busy=T.Tinner/r;
+    let pill;if(m==='diloco')pill='<span class="pill na">serial</span>';else if(m==='eager')pill='<span class="pill na">comm only</span>';
+    else{const h=T.hide[m],ok=S.H>=h;pill=`<span class="pill ${ok?'ok':'no'}">${ok?'hidden':'stalls'} · H≥${h}</span>`;}
+    return `<div class="card"><div class="nm"><span style="color:var(--${METH[m].col})">${METH[m].name}</span>${pill}</div>
+      <div class="big">${fmtT(r)}</div><div class="sm">per H-step round · GPU busy ${(busy*100).toFixed(0)}% · ${(T.round.diloco/r).toFixed(2)}× DiLoCo speed</div>
+      <div class="sm">Train ${fmtGB(20*S.P).replace(' GB','B').replace(' MB','M')} tokens (${Math.round(rounds)} syncs): <b style="color:var(--ink)">${fmtT(rounds*r)}</b></div></div>`;}).join('');}
+
+/* ---------- timeline canvas ---------- */
+const tl=$('#tl');let TL={ctx:null,w:0,h:0},hatch=null,bars=[];
+const ROWH=17,ROWG=4,HDR=24,LGAP=12,AX=26;
+function laneH(){return HDR+3*(ROWH+ROWG)+LGAP;}
+function fitTL(){const dpr=Math.min(2,devicePixelRatio||1),w=tl.clientWidth||800,n=Math.max(1,visibleLanes().length),h=AX+n*laneH();
+  tl.width=Math.round(w*dpr);tl.height=Math.round(h*dpr);tl.style.height=h+'px';const ctx=tl.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);TL={ctx,w,h};
+  const pc=document.createElement('canvas');pc.width=pc.height=7;const p=pc.getContext('2d');p.strokeStyle=C.stall;p.lineWidth=1.3;p.beginPath();p.moveTo(-1,8);p.lineTo(8,-1);p.stroke();hatch=ctx.createPattern(pc,'repeat');}
+function niceStep(r){const e=Math.pow(10,Math.floor(Math.log10(r))),f=r/e;return (f<1.5?1:f<3.5?2:f<7.5?5:10)*e;}
+function seqCol(s){return s==='look'?C.look:C.main;}
+let tau=0,tlPlaying=!reduceMotion,tlSpeed=1;
+function drawTL(){const {ctx,w,h}=TL;if(!ctx)return;ctx.clearRect(0,0,w,h);bars=[];
+  const narrow=w<600,LW=narrow?50:112,x0=LW,x1=w-6,sx=(x1-x0)/W,X=t=>x0+t*sx;
+  // axis
+  const st=niceStep(W/(narrow?4:9));ctx.font=`11px ${FM}`;ctx.textBaseline='middle';
+  for(let t=0;t<=W+1e-9;t+=st){const x=X(t);ctx.strokeStyle=rgba(C.line,1);ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x+.5,AX-4);ctx.lineTo(x+.5,h);ctx.stroke();
+    ctx.fillStyle=C.muted;ctx.textAlign='center';if(x<x1-20)ctx.fillText(fmtT(t).replace('.00',''),x,12);}
+  const rowNames=narrow?['inner','outer','net']:['GPU · inner','GPU · outer','Network'];
+  let y=AX;
+  for(const m of visibleLanes()){const ev=EV[m];
+    ctx.textAlign='left';ctx.font=`600 13px ${FD}`;ctx.fillStyle=C[METH[m].col];ctx.fillText(METH[m].name,8,y+12);
+    ctx.font=`11px ${FM}`;ctx.fillStyle=C.muted;ctx.textAlign='right';const r=T.round[m];
+    ctx.fillText(narrow?`${fmtT(r)} · ${(T.Tinner/r*100).toFixed(0)}%`:`${fmtT(r)}/round · GPU busy ${(T.Tinner/r*100).toFixed(0)}%`,x1,y+12);
+    const ry=i=>y+HDR+i*(ROWH+ROWG);
+    for(let i=0;i<3;i++){ctx.fillStyle=rgba(C.line,.35);ctx.fillRect(x0,ry(i),x1-x0,ROWH);ctx.fillStyle=C.muted;ctx.textAlign='left';ctx.font=`10.5px ${FM}`;ctx.fillText(rowNames[i],8,ry(i)+ROWH/2);}
+    ctx.save();ctx.beginPath();ctx.rect(x0,y,x1-x0,laneH());ctx.clip();
+    for(const e of ev){if(e.t0>W)continue;const yy=ry(e.row),a=X(e.t0),b=X(e.t1),bw=Math.max(0,b-a);const active=tau>=e.t0&&tau<e.t1;
+      if(e.kind==='stall'){if(bw<.5)continue;ctx.fillStyle=hatch;ctx.fillRect(a,yy,bw,ROWH);ctx.strokeStyle=C.stall;ctx.lineWidth=1;ctx.strokeRect(a+.5,yy+.5,bw-1,ROWH-1);}
+      else if(e.kind==='kernel'){const cx=a,cy=yy+ROWH/2,k=active||Math.abs(tau-e.t0)<W*.012;ctx.fillStyle=seqCol(e.seq);ctx.beginPath();ctx.moveTo(cx,cy-7);ctx.lineTo(cx+5,cy);ctx.lineTo(cx,cy+7);ctx.lineTo(cx-5,cy);ctx.closePath();ctx.fill();
+        if(k){ctx.strokeStyle=C.ink;ctx.lineWidth=1.5;ctx.stroke();}continue;}
+      else{const col=e.kind==='compute'?seqCol(e.seq):e.kind==='comm'?C.net:C.pcie;ctx.fillStyle=rgba(col,active?1:.86);ctx.fillRect(a,yy,bw,ROWH);
+        if(e.kind!=='compute'){ctx.fillStyle=seqCol(e.seq);ctx.fillRect(a,yy,Math.min(3,bw),ROWH);}
+        bars.push({x0:a,x1:b,y0:yy,y1:yy+ROWH,e,m});}
+      if(active&&bw>1){ctx.strokeStyle=C.ink;ctx.lineWidth=1.5;ctx.strokeRect(a+.75,yy+.75,bw-1.5,ROWH-1.5);}
+      if(e.label&&e.kind!=='stall'||(e.kind==='stall'&&bw>140)){ctx.font=`10.5px ${FM}`;const tw=ctx.measureText(e.label).width;
+        if(tw+10<bw){ctx.fillStyle=e.kind==='stall'?C.muted:C.surface;ctx.textAlign='left';fillTxt(ctx,e.label,a+6,yy+ROWH/2+.5);}}}
+    ctx.restore();y+=laneH();}
+  // playhead
+  const px=X(tau);ctx.strokeStyle=C.ink;ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(px,AX-6);ctx.lineTo(px,h);ctx.stroke();
+  ctx.fillStyle=C.ink;ctx.beginPath();ctx.moveTo(px-5,AX-12);ctx.lineTo(px+5,AX-12);ctx.lineTo(px,AX-5);ctx.fill();
+  $('#tlTime').textContent='t = '+fmtT(tau);
+}
+// drag handles + scrub
+let drag=null;
+function tlPos(ev){const r=tl.getBoundingClientRect();return {x:ev.clientX-r.left,y:ev.clientY-r.top};}
+function hitHandle(p){for(const b of bars){if(b.e.kind==='stall')continue;if(p.y>=b.y0&&p.y<=b.y1&&Math.abs(p.x-b.x1)<7&&b.x1-b.x0>4)return b;}return null;}
+function scrubTo(x){const narrow=TL.w<600,x0=narrow?50:112,x1=TL.w-6;tau=clamp((x-x0)/(x1-x0)*W,0,W*0.9999);}
+tl.addEventListener('pointermove',ev=>{const p=tlPos(ev);
+  if(drag){if(drag.type==='scrub'){scrubTo(p.x);return;}
+    const narrow=TL.w<600,x0=narrow?50:112,x1=TL.w-6,tx=(p.x-x0)/(x1-x0)*W,d=Math.max(1e-4,tx-drag.t0);
+    if(drag.kind==='compute'){S.H=clamp(Math.round(d/T.Tstep)+(drag.h0||0),1,100);}
+    else if(drag.kind==='comm'){const c=Math.max(S.lat+2e-4,d);S.bnet=clamp(2*(S.K-1)/S.K*4*S.P/(c-S.lat),Math.pow(10,-1.3)*1e9,1e11);ui.preset.value='custom';}
+    syncUI();rebuild();return;}
+  tl.style.cursor=hitHandle(p)?'col-resize':'pointer';});
+tl.addEventListener('pointerdown',ev=>{const p=tlPos(ev),b=hitHandle(p);tl.setPointerCapture(ev.pointerId);
+  if(b)drag={type:'edge',kind:b.e.kind,t0:b.e.t0,nbuf:b.e.nbuf||1,h0:b.e.h0||0};else{drag={type:'scrub'};scrubTo(p.x);}});
+tl.addEventListener('pointerup',()=>{drag=null;});tl.addEventListener('pointercancel',()=>{drag=null;});
+$('#tlPlay').addEventListener('click',()=>{tlPlaying=!tlPlaying;$('#tlPlay').textContent=tlPlaying?'Pause':'Play';});
+$('#tlPlay').textContent=tlPlaying?'Pause':'Play';
+$('#tlSpeed').addEventListener('change',e=>tlSpeed=+e.target.value);
+$('#tlScrub').addEventListener('input',e=>{tau=+e.target.value/1000*W*0.9999;});
+
+function activeAt(m,row){for(const e of EV[m]){if(e.row===row&&tau>=e.t0&&tau<e.t1&&e.kind!=='kernel')return e;}return null;}
+function lastKernel(m){let k=null;for(const e of EV[m])if(e.kind==='kernel'&&e.t0<=tau)k=e;return k;}
+function updateReadout(){
+  $('#readout').innerHTML=visibleLanes().map(m=>{const g=activeAt(m,0),n=activeAt(m,2);
+    let gs='—';if(g){gs=g.kind==='compute'?`${g.label.replace(/ · \d+ inner steps/,'')} · step ${Math.min(S.H,(g.h0||0)+Math.floor((tau-g.t0)/T.Tstep)+1)}/${S.H}`:g.label;}
+    const ns=n?`${n.label} ${Math.round((tau-n.t0)/(n.t1-n.t0)*100)}%`:'idle';
+    return `<div><b style="color:var(--${METH[m].col})">${METH[m].name.padEnd(15,' ')}</b> GPU: <b>${gs}</b> · net: ${ns}</div>`;}).join('');}
+
+/* ---------- canvas text ---------- */
+// canvas text with a hand-drawn tilde for "θ̃" / "g̃" (combining marks render unreliably on canvas)
+function fillTxt(ctx,t,x,y,align){const plain=t.replace(/\u0303/g,''),w=ctx.measureText(plain).width,sa=ctx.textAlign;
+  let cx=align==='center'?x-w/2:align==='right'?x-w:x;ctx.textAlign='left';
+  for(const part of t.split(/(.\u0303)/)){if(!part)continue;
+    if(part.length===2&&part[1]==='\u0303'){const ch=part[0],cw=ctx.measureText(ch).width;ctx.fillText(ch,cx,y);
+      const fs=parseFloat((ctx.font.match(/([\d.]+)px/)||[0,11])[1]),tx=cx+cw/2,ty=y-fs*(ch==='θ'?.62:.42),hw=fs*.24;
+      ctx.save();ctx.strokeStyle=ctx.fillStyle;ctx.lineWidth=Math.max(.9,fs*.085);ctx.lineCap='round';ctx.beginPath();ctx.moveTo(tx-hw,ty+.6);
+      ctx.quadraticCurveTo(tx-hw/2,ty-fs*.16,tx,ty);ctx.quadraticCurveTo(tx+hw/2,ty+fs*.16,tx+hw,ty-.6);ctx.stroke();ctx.restore();cx+=cw;}
+    else{ctx.fillText(part,cx,y);cx+=ctx.measureText(part).width;}}
+  ctx.textAlign=sa;}
+/* ---------- 1. Figure 2, animated ---------- */
+const F2={x0:140,P:210,Wc:160,bw:56,gw:80,oy:46,oh:32,iy:128,ip:38,ih:28,W:970,ix:40};
+const F2C=[
+  {inn:'main',ib:'θ',it:'0',stage:'Lookahead stage 0',iopt:'M',fromS:['θ','0'],og:'g̃',ogs:'0',oa:'θ̃',oas:'1',oopt:'L',gH:'g̃<sub>0</sub>',aH:'θ̃<sub>1</sub>',init:true},
+  {inn:'look',ib:'θ̃',it:'1',stage:'Main stage 0',iopt:'L',fromS:['θ̃','1'],og:'g',ogs:'0',oa:'θ',oas:'1',oopt:'M',gH:'g<sub>0</sub>',aH:'θ<sub>1</sub>'},
+  {inn:'main',ib:'θ',it:'1',stage:'Lookahead stage 1',iopt:'M',fromS:['θ','1'],og:'g̃',ogs:'1',oa:'θ̃',oas:'2',oopt:'L',gH:'g̃<sub>1</sub>',aH:'θ̃<sub>2</sub>'},
+  {inn:'look',ib:'θ̃',it:'2',stage:'Main stage 1',iopt:'L',fromS:['θ̃','2'],og:'g',ogs:'1',oa:'θ',oas:'2',oopt:'M',gH:'g<sub>1</sub>',aH:'θ<sub>2</sub>'}];
+const F2AR0=.02,F2AR1=.84,F2OP1=.95,F2T=4.5;
+function f2sym(x,y,base,sup,sub,fs,anchor){const s=fs*.7,tl=base.indexOf('\u0303')>=0,b=base.replace('\u0303','');
+  const bwd=fs*.6,swd=s*.6*Math.max(sup!=null?String(sup).length:0,String(sub).length),left=anchor==='start'?x:x-(bwd+swd)/2,xs=left+bwd+.6;
+  let o=`<text x="${left.toFixed(1)}" y="${y}" style="font-size:${fs}px">${b}</text>`;
+  if(tl){const w=fs*.44,h=fs*.12,ty=y-fs*(b==='θ'?.9:.7),tx=left+bwd/2-w/2;
+    o+=`<path d="M${tx.toFixed(1)},${ty.toFixed(1)} q${(w/4).toFixed(1)},${(-h).toFixed(1)} ${(w/2).toFixed(1)},0 t${(w/2).toFixed(1)},0" stroke-width="1.1" stroke-linecap="round" style="fill:none;stroke:var(--ink)"/>`;}
+  if(sup!=null)o+=`<text x="${xs.toFixed(1)}" y="${(y-fs*.42).toFixed(1)}" style="font-size:${s}px">${sup}</text><text x="${xs.toFixed(1)}" y="${(y+fs*.34).toFixed(1)}" style="font-size:${s}px">${sub}</text>`;
+  else o+=`<text x="${xs.toFixed(1)}" y="${(y+fs*.3).toFixed(1)}" style="font-size:${s}px">${sub}</text>`;
+  return o;}
+const f2fill=(col,k)=>`color-mix(in srgb,var(--${col}) ${k}%,var(--surface))`;
+function f2box(id,x,y,w,h,col){return `<rect id="${id}" x="${x}" y="${y}" width="${w}" height="${h}" rx="5" style="fill:${f2fill(col,12)};stroke:var(--${col});stroke-width:1.3"/>`;}
+function f2curve(x1,y1,x2,y2){const d=(x2-x1)*.55;return `M${x1},${y1} C${x1+d},${y1} ${x2-d},${y2} ${x2},${y2}`;}
+function f2path(d,col,thick,mark,extra){return `<path class="${thick?'thick':''}" d="${d}" stroke-width="1.4" ${extra||''} style="fill:none;stroke:var(--${col})" ${mark?`marker-end="url(#f2a-${col})"`:''}/>`;}
+function buildF2(){const {x0,P,Wc,bw,gw,oy,oh,iy,ip,ih,W,ix}=F2,oyc=oy+oh/2,ryc=i=>iy+i*ip+ih/2,midY=(iy+iy+3*ip+ih)/2;
+  let s=`<defs>${['main','look','muted'].map(c=>`<marker id="f2a-${c}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" style="fill:var(--${c})"/></marker>`).join('')}</defs>`;
+  s+=`<text class="lab" transform="translate(20 ${oyc}) rotate(-90)" text-anchor="middle">Outer</text>`;
+  s+=`<text class="lab" transform="translate(20 ${midY}) rotate(-90)" text-anchor="middle">Inner stream</text>`;
+  s+=`<line x1="32" x2="${W-8}" y1="108" y2="108" stroke-width="1.2" stroke-dasharray="8 6" style="stroke:var(--muted)"/>`;
+  // initial pair θ0 = θ̃0 seeds the first stage
+  s+=`<g id="f2-lead" class="grp">${[0,1,2,3].map(i=>f2path(f2curve(ix+bw,oyc,x0-1,ryc(i)),'main',true,true)).join('')}</g>`;
+  s+=f2box('f2-init',ix,oy,bw,oh,'main')+f2sym(ix+bw/2,oyc+4.5,'θ',null,'0',14);
+  s+=`<text class="stg-s" x="${ix+bw/2}" y="${oy+oh+16}" text-anchor="middle">init</text>`;
+  for(let c=0;c<4;c++){const C2=F2C[c],ic=C2.inn,oc=ic==='look'?'main':'look',cx=x0+c*P;
+    if(c<3){s+=`<g id="f2-fo-${c}" class="grp">${[0,1,2,3].map(i=>f2path(f2curve(cx+Wc,oyc,cx+P-1,ryc(i)),oc,true,true)).join('')}</g>`;
+      s+=`<g id="f2-fi-${c+1}" class="grp">${[0,1,2,3].map(i=>f2path(f2curve(cx+Wc,ryc(i),cx+P-1,oyc),ic,true,true)).join('')}</g>`;}
+    if(C2.og==='g̃'&&c<3)s+=`<g id="f2-h-${c}" class="grp">${f2path(`M${cx+gw+6},${oyc} V28 H${cx+P+gw+12} V${oyc-2}`,'look',true,false,c===0?'stroke-dasharray="5 4"':'')}</g>`;
+    s+=`<g id="f2-icol-${c}" class="grp">`;
+    for(let i=0;i<4;i++){const y=iy+i*ip,yc=ryc(i),xa=cx+bw,xb=cx+Wc-bw-1;
+      s+=`<line x1="${xa}" x2="${xb}" y1="${yc}" y2="${yc}" stroke-width="1.3" style="stroke:var(--${ic});opacity:.45" marker-end="url(#f2a-${ic})"/>`;
+      s+=`<line id="f2-pr-${c}-${i}" x1="${xa}" x2="${xb-4}" y1="${yc}" y2="${yc}" stroke-width="3" stroke-linecap="round" stroke-dasharray="0 200" style="stroke:var(--${ic})"/>`;
+      s+=`<circle id="f2-dot-${c}-${i}" cx="${xa}" cy="${yc}" r="3.6" style="fill:var(--${ic});display:none"/>`;
+      s+=f2box(`f2-s-${c}-${i}`,cx,y,bw,ih,ic)+f2sym(cx+bw/2,yc+3.5,C2.ib,i+1,`${C2.it},0`,12.5);
+      s+=f2box(`f2-e-${c}-${i}`,cx+Wc-bw,y,bw,ih,ic)+f2sym(cx+Wc-bw/2,yc+3.5,C2.ib,i+1,`${C2.it},H`,12.5);
+      if(c===3)s+=`<text x="${cx+Wc+20}" y="${yc+4}" text-anchor="middle" style="fill:var(--muted)">⋯</text>`;}
+    s+=`<text class="stg-t" x="${cx+Wc/2}" y="${iy+3*ip+ih+20}" text-anchor="middle" style="fill:var(--${ic})">${C2.stage}</text>`;
+    {const yy=iy+3*ip+ih+36,xm=cx+Wc/2+28;s+=`<text class="stg-s" x="${xm}" y="${yy}" text-anchor="end">InnerOpt<tspan dy="3" style="font-size:8px">${C2.iopt}</tspan><tspan dy="-3"> · from </tspan></text><g class="stg-s">${f2sym(xm+5,yy,C2.fromS[0],null,C2.fromS[1],11,'start')}</g>`;}
+    s+=`</g><g id="f2-ocol-${c}" class="grp">`;
+    s+=f2box(`f2-g-${c}`,cx,oy,gw,oh,oc)+f2sym(cx+gw/2-(C2.init?12:0),oyc+4.5,C2.og,null,C2.ogs,14);
+    if(C2.init)s+=`<text x="${cx+gw/2+4}" y="${oyc+4.5}" style="font-size:13px">= 0</text>`;
+    s+=`<rect id="f2-gb-${c}" x="${cx+3}" y="${oy+oh-6}" width="0" height="3.5" rx="1.5" style="fill:var(--net)"/>`;
+    s+=`<line x1="${cx+gw}" x2="${cx+Wc-bw-1}" y1="${oyc}" y2="${oyc}" stroke-width="1.4" style="stroke:var(--${oc})" marker-end="url(#f2a-${oc})"/>`;
+    s+=f2box(`f2-a-${c}`,cx+Wc-bw,oy,bw,oh,oc)+f2sym(cx+Wc-bw/2,oyc+4.5,C2.oa,null,C2.oas,14);
+    s+=`<rect id="f2-ab-${c}" x="${cx+Wc-bw+3}" y="${oy+oh-6}" width="0" height="3.5" rx="1.5" style="fill:var(--${oc})"/>`;
+    s+=`<text class="stg-s" x="${cx+Wc-bw/2}" y="${oy+oh+16}" text-anchor="middle">OuterOpt<tspan dy="3" style="font-size:8px">${C2.oopt}</tspan></text>`;
+    if(c===3)s+=`<text x="${cx+Wc+20}" y="${oyc+4}" text-anchor="middle" style="fill:var(--muted)">⋯</text>`;
+    s+=`</g>`;}
+  $('#f2').innerHTML=s;}
+let tau2=reduceMotion?1.5:0,f2Playing=!reduceMotion,f2Hold=0,f2CapI=-1,f2StatS='';
+const f2el=id=>document.getElementById(id);
+const f2nw=h=>h.replace(/(.\u0303ⁱ?<sub>[^<]*<\/sub>)/g,'<span class="nw">$1</span>');
+function f2op(id,v){const e=f2el(id);if(e)e.style.opacity=v;}
+function f2flow(id,on){const e=f2el(id);if(e)e.classList.toggle('flow',on);}
+function f2Update(){const {Wc,bw,gw,x0,P}=F2,c=Math.min(3,Math.floor(tau2)),fr=tau2>=4?1:tau2-c,L=Wc-2*bw-5;
+  for(let k=0;k<4;k++){const C2=F2C[k],ic=C2.inn,oc=ic==='look'?'main':'look',cx=x0+k*P,st=k<c?2:k===c?1:0;
+    f2op(`f2-icol-${k}`,st===0?.28:st===1?1:.72);f2op(`f2-ocol-${k}`,st===0?.28:st===1?1:.72);
+    const p=st===2?1:st===1?fr:0;
+    for(let i=0;i<4;i++){f2el(`f2-pr-${k}-${i}`).setAttribute('stroke-dasharray',`${(L*p).toFixed(1)} 200`);
+      const d=f2el(`f2-dot-${k}-${i}`);d.style.display=st===1&&p<1?'':'none';d.setAttribute('cx',(cx+bw+L*p).toFixed(1));
+      f2el(`f2-s-${k}-${i}`).style.fill=f2fill(ic,st>=1?28:12);f2el(`f2-e-${k}-${i}`).style.fill=f2fill(ic,p>=1?28:12);}
+    // g̃0 = 0 is known at start: no all-reduce, and θ̃1 = θ0 is ready at once
+    const ar=C2.init?0:st===2?1:st===1?clamp((fr-F2AR0)/(F2AR1-F2AR0),0,1):0,oo=C2.init?(st>=1?1:0):st===2?1:st===1?clamp((fr-F2AR1)/(F2OP1-F2AR1),0,1):0;
+    f2el(`f2-gb-${k}`).setAttribute('width',((gw-6)*ar).toFixed(1));f2el(`f2-ab-${k}`).setAttribute('width',((bw-6)*oo).toFixed(1));
+    f2el(`f2-g-${k}`).style.fill=f2fill(oc,(C2.init?st>=1:ar>=1)?28:12);f2el(`f2-a-${k}`).style.fill=f2fill(oc,oo>=1?34:12);
+    if(k>=1){const on=k===c&&fr<F2AR1;f2op(`f2-fi-${k}`,k>c?.14:on?1:.5);f2flow(`f2-fi-${k}`,on);}
+    if(k<=2){const ready=k<c||(k===c&&(C2.init||fr>=F2OP1)),pulse=c===k+1&&fr<.12;f2op(`f2-fo-${k}`,!ready?.14:pulse?1:.5);f2flow(`f2-fo-${k}`,pulse);}}
+  const lead=c===0&&fr<.12;f2op('f2-lead',lead?1:.5);f2flow('f2-lead',lead);
+  const use0=c===1&&fr>=F2AR1&&fr<F2OP1;f2op('f2-h-0',use0?1:tau2<1+F2OP1?.6:.3);f2flow('f2-h-0',use0);
+  const use2=c===3&&fr>=F2AR1&&fr<F2OP1;f2op('f2-h-2',use2?1:tau2>=2+F2AR1&&tau2<3+F2OP1?.7:tau2>=3+F2OP1?.3:.14);f2flow('f2-h-2',use2);
+  $$('.stg').forEach(b=>b.classList.toggle('on',+b.dataset.s===c));
+  const C2=F2C[c],H=S.H,h=fr>=1?H:Math.min(H,Math.floor(fr*H)+1),oo=C2.inn==='look'?'M':'L';
+  const outer=C2.init?`g̃<sub>0</sub> = 0, θ̃<sub>1</sub> = θ<sub>0</sub>, nothing to send`:fr<F2AR0?`launch ${C2.gH}`:fr<F2AR1?`all-reduce ${C2.gH} ${Math.round(clamp((fr-F2AR0)/(F2AR1-F2AR0),0,1)*100)}%`:fr<F2OP1?`OuterOpt<sub>${oo}</sub> → ${C2.aH}`:`${C2.aH} ready`;
+  const stat=`<div><b>${C2.stage}</b> · inner: step <b>${h}/${H}</b> · outer: <b>${outer}</b></div>`;
+  if(stat!==f2StatS){f2StatS=stat;$('#f2Stat').innerHTML=f2nw(stat);tildes($('#f2Stat'));}}
+function f2Tick(dt){if(f2Playing){if(tau2>=4){f2Hold+=dt;if(f2Hold>1.4){f2Hold=0;tau2=0;}}else tau2=Math.min(4,tau2+dt/F2T);}f2Update();}
+function f2Go(c){tau2=clamp(c,0,3);f2Hold=0;}
+$$('.stg').forEach(b=>b.addEventListener('click',()=>f2Go(+b.dataset.s)));
+$('#f2Prev').addEventListener('click',()=>{const c=Math.min(3,Math.floor(tau2));f2Go(tau2-c>.15?c:c-1);});
+$('#f2Next').addEventListener('click',()=>f2Go(Math.min(3,Math.floor(tau2))+1));
+$('#f2Play').addEventListener('click',()=>{f2Playing=!f2Playing;$('#f2Play').textContent=f2Playing?'Pause':'Play';});
+$('#f2Play').textContent=f2Playing?'Pause':'Play';
+buildF2();f2Update();
+
+/* ---------- main loop ---------- */
+let last=performance.now(),roAcc=0;
+function frame(now){const dt=clamp((now-last)/1000,0,.1);last=now;
+  if(tlPlaying&&!drag){tau+=dt*tlSpeed;if(tau>=W)tau=0;}
+  f2Tick(dt);$('#tlScrub').value=Math.round(tau/W*1000);drawTL();roAcc+=dt;if(roAcc>.1){updateReadout();roAcc=0;}
+  requestAnimationFrame(frame);}
+function refitAll(){readColors();fitTL();}
+new ResizeObserver(()=>{refitAll();}).observe(document.body);
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',refitAll);
+new MutationObserver(refitAll).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+tildes(document.querySelector('header'));tildes(document.querySelector('main'));syncUI();rebuild();updateReadout();
+if(reduceMotion){tau=W*0.4;}
+requestAnimationFrame(frame);
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(refitAll);
+})();
+</script>
+</body>
+</html>
